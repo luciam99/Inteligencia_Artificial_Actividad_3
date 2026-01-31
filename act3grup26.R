@@ -5,6 +5,15 @@
 ### 3) Supervisado: SVM, KNN, SVM-Kernel,Árboles de decisión,Random Forest + métricas (CM, Precision, Sensitivity, Specificity, F1)
 ############################################################
 
+install.packages("tidyverse")
+install.packages("caret")
+install.packages("factoextra")
+install.packages("randomForest")
+install.packages("ggplot2")
+install.packages("stats")
+install.packages("Rtsne")
+install.packages("kernlab")
+
 library(tidyverse)
 library(caret)
 library(factoextra)
@@ -13,9 +22,12 @@ library(ggplot2)
 library(stats)  
 library(Rtsne)
 library(kernlab)
+
 # ###############################################################################
 # Generación de un único dataframe
 # ###############################################################################
+
+setwd("C:/Users/Usuario/Downloads")
 
 f_c <- list.files(pattern="classes.csv$", ignore.case=TRUE)
 df_c<-read.csv(f_c, header = FALSE,sep = ";",col.names = c("ID","Clase"))
@@ -151,22 +163,77 @@ ggplot(tsne_df, aes(x = TSNE1, y = TSNE2, color = Clase)) +
 # Preparación de los datos
 df_filtrado$Clase <- as.factor(df_filtrado$Clase)
 
-# Partición de datos
+# Partición de datos: 80% entrenamiento, 20% prueba
 trainIndex <- createDataPartition(df_filtrado$Clase, p = 0.8, list = FALSE)
 train_set <- df_filtrado[trainIndex, ]
 test_set  <- df_filtrado[-trainIndex, ]
 
-# Entrenamiento del Modelo SVM 
-# El kernel usado es lineal por que los datos son de alta dimensionalidad 
+# Configuración: validación cruzada 5-fold
 ctrl <- trainControl(method = "cv", number = 5, verboseIter = FALSE)
 
+# Entrenamiento SVM con kernel lineal (adecuado para alta dimensionalidad)
 svm_model <- train(
   Clase ~ ., 
-  data = train_set %>% select(-ID), # Excluimos el ID para que no interfiera
+  data = train_set %>% select(-ID), # Excluir ID (no es variable predictora)
   method = "svmLinear",
   trControl = ctrl,
-  preProcess = c("center", "scale") # Aseguramos que los datos estén normalizados
+  preProcess = c("center", "scale") # Normalización Z-score
 )
 
-#Predicciones
+# Predicciones SVM en conjunto de prueba
 predictions <- predict(svm_model, newdata = test_set)
+
+# Random Forest ----------------------------------------------------------------
+# Entrenamiento Random Forest: robusto para datos de alta dimensionalidad
+set.seed(123) # Para reproducibilidad
+rf_model <- train(
+  Clase ~ ., 
+  data = train_set[, colnames(train_set) != "ID"], # Excluir ID
+  method = "rf",
+  trControl = ctrl, # Misma configuración que SVM
+  ntree = 150 # Número de árboles (balance tiempo/precisión)
+)
+
+# Predicciones Random Forest
+predictions_rf <- predict(rf_model, test_set)
+
+# KNN --------------------------------------------------------------------------
+# Entrenamiento K-Nearest Neighbors: clasificación por similitud
+knn_model <- train(
+  Clase ~ .,
+  data = train_set[, colnames(train_set) != "ID"], # Excluir ID
+  method = "knn",
+  trControl = ctrl, # Misma configuración
+  tuneGrid = expand.grid(k = c(3, 5, 7)) # Valores de k probados
+)
+
+# Predicciones KNN
+predictions_knn <- predict(knn_model, test_set)
+
+# Cálculo de métricas ----------------------------------------------------------
+# Función para calcular métricas multiclase (5 clases)
+get_metrics <- function(pred, actual) {
+  cm <- confusionMatrix(pred, actual)
+  # Promedio macro (todas las clases igual importancia)
+  c(
+    Accuracy = cm$overall["Accuracy"],
+    Precision = mean(cm$byClass[, "Precision"], na.rm = TRUE),
+    Sensitivity = mean(cm$byClass[, "Sensitivity"], na.rm = TRUE),
+    Specificity = mean(cm$byClass[, "Specificity"], na.rm = TRUE),
+    F1 = mean(cm$byClass[, "F1"], na.rm = TRUE)
+  )
+}
+
+# Tabla comparativa de los 3 modelos
+results <- data.frame(
+  Modelo = c("SVM", "Random Forest", "KNN"),
+  rbind(
+    get_metrics(predictions, test_set$Clase),
+    get_metrics(predictions_rf, test_set$Clase),
+    get_metrics(predictions_knn, test_set$Clase)
+  )
+)
+
+# Resultados -------------------------------------------------------------------
+print("Resultados comparación modelos supervisados")
+print(results)
