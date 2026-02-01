@@ -14,6 +14,9 @@ library(stats)
 library(Rtsne)
 library(kernlab)
 
+# Semilla para reproducibilidad del código
+set.seed(123)
+
 # ###############################################################################
 # Generación de un único dataframe
 # ###############################################################################
@@ -112,9 +115,6 @@ ggplot(pca_df, aes(PC1, PC2, color = Clase)) +
 # t-SNE no permite duplicados 
 X_unique <- unique(X_scaled)
 
-# Establecer semilla para reproducibilidad 
-set.seed(42)
-
 # Ejecución de t-SNE
 tsne_res <- Rtsne(X_scaled, 
                   dims = 2, 
@@ -141,8 +141,6 @@ ggplot(tsne_df, aes(x = TSNE1, y = TSNE2, color = Clase)) +
        y = "t-SNE dimensión 2")
 
 # ################################Clusterización################################
-
-set.seed(123)
 
 # K-means ----------------------------------------------------------------------
 
@@ -219,11 +217,10 @@ svm_model <- train(
 )
 
 # Predicciones SVM en conjunto de prueba
-predictions <- predict(svm_model, newdata = test_set)
+predictions_svm <- predict(svm_model, newdata = test_set)
 
 # Random Forest ----------------------------------------------------------------
 # Entrenamiento Random Forest: robusto para datos de alta dimensionalidad
-set.seed(123) # Para reproducibilidad
 rf_model <- train(
   Clase ~ ., 
   data = train_set[, colnames(train_set) != "ID"], # Excluir ID
@@ -266,7 +263,7 @@ get_metrics <- function(pred, actual) {
 results <- data.frame(
   Modelo = c("SVM", "Random Forest", "KNN"),
   rbind(
-    get_metrics(predictions, test_set$Clase),
+    get_metrics(predictions_svm, test_set$Clase),
     get_metrics(predictions_rf, test_set$Clase),
     get_metrics(predictions_knn, test_set$Clase)
   )
