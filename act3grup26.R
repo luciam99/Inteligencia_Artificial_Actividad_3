@@ -14,6 +14,9 @@ library(stats)
 library(Rtsne)
 library(kernlab)
 
+# Semilla para reproducibilidad del código
+set.seed(123)
+
 # ###############################################################################
 # Generación de un único dataframe
 # ###############################################################################
@@ -112,9 +115,6 @@ ggplot(pca_df, aes(PC1, PC2, color = Clase)) +
 # t-SNE no permite duplicados 
 X_unique <- unique(X_scaled)
 
-# Establecer semilla para reproducibilidad 
-set.seed(42)
-
 # Ejecución de t-SNE
 tsne_res <- Rtsne(X_scaled, 
                   dims = 2, 
@@ -141,6 +141,53 @@ ggplot(tsne_df, aes(x = TSNE1, y = TSNE2, color = Clase)) +
        y = "t-SNE dimensión 2")
 
 # ################################Clusterización################################
+
+# K-means ----------------------------------------------------------------------
+
+# Elbow method para evaluar el número de centroides óptimo
+fviz_nbclust(X_scaled, kmeans, method = "wss") +
+  geom_vline(xintercept = 5, linetype = 2) +
+  theme_classic()
+
+# Clustering con K-means
+kmeans.result <- kmeans(X_scaled, centers = 5, nstart = 25)
+
+# Visualización
+fviz_cluster(kmeans.result, data = X_scaled, geom = "point") +
+  ggtitle("K-means (k = 5)", subtitle = "") +
+  theme_minimal()
+
+# Comparación de los resultados con los datos reales
+table(Cluster_Kmeans = kmeans.result$cluster, Clase_Real = df_filtrado$Clase)
+
+
+# Clustering jerárquico aglomerativo -------------------------------------------
+
+# Cálculo de la matriz de distancias
+dist_matrix <- dist(X_scaled)
+
+# Clustering jerárquico
+hclust_model <- hclust(dist_matrix, method = "ward.D2")
+
+# Visualización del dendograma
+fviz_dend(hclust_model,
+          k = 5,
+          cex = 0.5,
+          rect = TRUE,
+          main = "Dendrograma de Clustering Jerárquico (Ward)",
+          xlab = "Índice de Observaciones",
+          ylab = "Distancia") + theme_classic()
+
+# Visualización del heatmap
+heatmap(as.matrix(dist_matrix),
+        symm = TRUE, 
+        distfun = function(x) as.dist(x),
+        hclustfun = function(x) hclust(x, method = "ward.D2"),
+        labRow = FALSE, labCol = FALSE)
+
+# Comparación de los resultados con los datos reales
+df_filtrado$Cluster_hclust <- cutree(hclust_model, k = 5)
+table(Cluster_hclust = df_filtrado$Cluster_hclust, Clase_Real = df_filtrado$Clase)
 
 
 # ##############################################################################
@@ -170,11 +217,10 @@ svm_model <- train(
 )
 
 # Predicciones SVM en conjunto de prueba
-predictions <- predict(svm_model, newdata = test_set)
+predictions_svm <- predict(svm_model, newdata = test_set)
 
 # Random Forest ----------------------------------------------------------------
 # Entrenamiento Random Forest: robusto para datos de alta dimensionalidad
-set.seed(123) # Para reproducibilidad
 rf_model <- train(
   Clase ~ ., 
   data = train_set[, colnames(train_set) != "ID"], # Excluir ID
@@ -217,7 +263,7 @@ get_metrics <- function(pred, actual) {
 results <- data.frame(
   Modelo = c("SVM", "Random Forest", "KNN"),
   rbind(
-    get_metrics(predictions, test_set$Clase),
+    get_metrics(predictions_svm, test_set$Clase),
     get_metrics(predictions_rf, test_set$Clase),
     get_metrics(predictions_knn, test_set$Clase)
   )
@@ -230,4 +276,31 @@ print(results)
 
 ################################################################################
 
+# FUNCIÓN PARA MOSTRAR MATRICES DE CONFUSION PARA SVM, RAMDON FOREST Y KNN
+evaluar_modelo <- function(predicciones, reales) {
+  # Es vital que ambos sean 'factors' con los mismos niveles
+  reales <- as.factor(reales)
+  predicciones <- factor(predicciones, levels = levels(reales))
+  
+  # Generar la matriz de confusión completa
+  mc <- confusionMatrix(predicciones, reales, mode = "everything")
+  
+  # Imprimir resultados clave
+  print(mc$table) # Muestra la matriz
+  cat("\nMetricas Detalladas:\n")
+  cat("Accuracy (Exactitud):", mc$overall['Accuracy'], "\n")
+  
+  
+  return(mc)
+}
 
+# Aplicacion a tus modelos
+cat("--- RESULTADOS SVM ---\n")
+vector_factor <- as.factor(test_set[[2]])
+res_svm <- evaluar_modelo(predictions, vector_factor)
+
+cat("\n--- RESULTADOS RANDOM FOREST ---\n")
+res_rf  <- evaluar_modelo(predictions_rf, vector_factor)
+
+cat("\n--- RESULTADOS KNN ---\n")
+res_knn <- evaluar_modelo(predictions_knn, vector_factor)
