@@ -230,4 +230,32 @@ print(results)
 
 ################################################################################
 
+# FUNCIÓN PARA MOSTRAR MATRICES DE CONFUSION PARA SVM, RAMDON FOREST Y KNN
+evaluar_modelo <- function(predicciones, reales) {
+  # Es vital que ambos sean 'factors' con los mismos niveles
+  reales <- as.factor(reales)
+  predicciones <- factor(predicciones, levels = levels(reales))
+  
+  # Generar la matriz de confusión completa
+  mc <- confusionMatrix(predicciones, reales, mode = "everything")
+  
+  # Imprimir resultados clave
+  print(mc$table) # Muestra la matriz
+  cat("\nMetricas Detalladas:\n")
+  cat("Accuracy (Exactitud):", mc$overall['Accuracy'], "\n")
+  
+  
+  return(mc)
+}
+
+# 2. Aplicación a tus modelos
+cat("--- RESULTADOS SVM ---\n")
+vector_factor <- as.factor(test_set[[2]])
+res_svm <- evaluar_modelo(predictions, vector_factor)
+
+cat("\n--- RESULTADOS RANDOM FOREST ---\n")
+res_rf  <- evaluar_modelo(predictions_rf, vector_factor)
+
+cat("\n--- RESULTADOS KNN ---\n")
+res_knn <- evaluar_modelo(predictions_knn, vector_factor)
 
