@@ -142,55 +142,6 @@ ggplot(tsne_df, aes(x = TSNE1, y = TSNE2, color = Clase)) +
 
 # ################################Clusterización################################
 
-set.seed(123)
-
-# K-means ----------------------------------------------------------------------
-
-# Elbow method para evaluar el número de centroides óptimo
-fviz_nbclust(X_scaled, kmeans, method = "wss") +
-  geom_vline(xintercept = 5, linetype = 2) +
-  theme_classic()
-
-# Clustering con K-means
-kmeans.result <- kmeans(X_scaled, centers = 5, nstart = 25)
-
-# Visualización
-fviz_cluster(kmeans.result, data = X_scaled, geom = "point") +
-  ggtitle("K-means (k = 5)", subtitle = "") +
-  theme_minimal()
-
-# Comparación de los resultados con los datos reales
-table(Cluster_Kmeans = kmeans.result$cluster, Clase_Real = df_filtrado$Clase)
-
-
-# Clustering jerárquico aglomerativo -------------------------------------------
-
-# Cálculo de la matriz de distancias
-dist_matrix <- dist(X_scaled)
-
-# Clustering jerárquico
-hclust_model <- hclust(dist_matrix, method = "ward.D2")
-
-# Visualización del dendograma
-fviz_dend(hclust_model,
-          k = 5,
-          cex = 0.5,
-          rect = TRUE,
-          main = "Dendrograma de Clustering Jerárquico (Ward)",
-          xlab = "Índice de Observaciones",
-          ylab = "Distancia") + theme_classic()
-
-# Visualización del heatmap
-heatmap(as.matrix(dist_matrix),
-        symm = TRUE, 
-        distfun = function(x) as.dist(x),
-        hclustfun = function(x) hclust(x, method = "ward.D2"),
-        labRow = FALSE, labCol = FALSE)
-
-# Comparación de los resultados con los datos reales
-df_filtrado$Cluster_hclust <- cutree(hclust_model, k = 5)
-table(Cluster_hclust = df_filtrado$Cluster_hclust, Clase_Real = df_filtrado$Clase)
-
 
 # ##############################################################################
 # Métodos de aprendizaje supervisado
